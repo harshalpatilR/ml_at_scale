@@ -219,7 +219,7 @@ all_routes = flight_df\
   .withColumn("combo_hash", hash("ORIGIN")+hash("DEST"))\
   .withColumn("combo", concat(col("ORIGIN"),col("DEST")))\
   .groupby("combo_hash")\
-  .agg(count("combo_hash").alias("count_all"),first("combo").alias("route_alias"))\
+  .agg(count("combo_hash").alias("count_all"),first("combo").alias("route_alias_all"))\
   .sort("count_all",ascending=False)
 
 cancelled_routes_all = flight_df\
@@ -236,19 +236,105 @@ cancelled_routes_percentage = cancelled_routes_all\
     cancelled_routes_all.combo_hash == all_routes.combo_hash
   )\
   .withColumn(
-    "route_alias", 
+    "route", 
     concat(
-                subrcol("route_alias"),col("DEST")))
+      substring(col("route_alias"),0,3),
+      lit("<>"),
+      substring(col("route_alias"),4,6)
+    )
+  )\
+  .withColumn(
+    "cancelled_percent", 
+    col("count")/col("count_all")*100
+  )\
+  .select("route","count","count_all","cancelled_percent")\
+  .sort("cancelled_percent",ascending=False)
 
-cancelled_routes_percentage <-
-  cancelled_routes_all %>% 
-  inner_join(all_routes,by="combo_hash") %>%
-  mutate(
-    route = paste(
-          substr(first_val.x,0,3), "<>",dest = substr(first_val.x,4,6),sep = ""
-        ), 
-    cancelled_percent = count/count_all*100) %>% 
-  select(route,count_all,count_all,cancelled_percent) %>%
-  arrange(desc(cancelled_percent)) 
+cancelled_routes_percentage.toPandas()
+
+## Cancelled Routes Plotted on a Map
+
+airports = spark.read.csv(
+  path="s3a://ml-field/demo/flight-analysis/data/airports_orig.csv",
+  header=True,
+  inferSchema=True
+)
+
+cancelled_routes_combo = cancelled_routes_all
+
+cancelled_routes_combo = cancelled_routes_combo\
+  .withColumn("orig",substring(col("route_alias"),0,3))\
+  .withColumn("dest",substring(col("route_alias"),4,6))
+
+cancelled_routes_combo = cancelled_routes_combo\
+  .join(
+    airports,
+    cancelled_routes_combo.orig == airports.iata
+  )
   
-cancelled_routes_percentage %>% as.data.frame
+cancelled_routes_combo = cancelled_routes_combo\
+  .withColumnRenamed("lat","orig_lat")\
+  .withColumnRenamed("long","orig_long")\
+  .select("count","orig","dest","orig_lat","orig_long")
+  
+cancelled_routes_combo = cancelled_routes_combo\
+  .join(
+    airports,
+    cancelled_routes_combo.dest == airports.iata
+  )
+  
+cancelled_routes_combo = cancelled_routes_combo\
+  .withColumnRenamed("lat","dest_lat")\
+  .withColumnRenamed("long","dest_long")\
+  .select("count","orig","dest","orig_lat","orig_long","dest_lat","dest_long")\
+  .filter((col("orig_lat") > 20) & (col("orig_lat") < 50) & (col("count") > 500))
+
+
+from ipyleaflet import Map, Marker
+
+center = (52.204793, 360.121558)
+
+m = Map(center=center, zoom=15)
+
+marker = Marker(location=center, draggable=True)
+m.add_layer(marker);
+
+mm
+
+  
+#
+#map3 = leaflet(cancelled_routes_combo) %>% 
+#  addProviderTiles(providers$CartoDB.Positron)
+#
+#for(i in 1:nrow(cancelled_routes_combo)){
+#    map3 <- 
+#      addPolylines(
+#        map3, 
+#        lat = as.numeric(cancelled_routes_combo[i,c(4,6)]), 
+#        lng = as.numeric(cancelled_routes_combo[i,c(5,7)]),
+#        weight = 10*(as.numeric(cancelled_routes_combo[i,1]/9881)+0.1), 
+#        opacity = 0.8*(as.numeric(cancelled_routes_combo[i,1]/9881)+0.05),
+#        color = "#888"
+#      )
+#}
+#map3
+#
+### Which columns are useful?
+#
+### TIP
+#
+#unused_columns <- airlines %>%
+#  filter(CANCELLED == 1) %>%
+#  summarise_all(~sum(as.integer(is.na(.)))) %>%
+#  select_if(~sum(.) > 0) 
+#
+#unused_columns %>% as.data.frame
+#
+#unused_columns %>% colnames
+#
+##  filter_all(any_vars(. > 1)) %>% as.data.frame
+
+
+
+
+
