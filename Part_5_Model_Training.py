@@ -84,4 +84,5 @@ predictionslr = lrModel.transform(test)
 evaluator = BinaryClassificationEvaluator(labelCol="CANCELLED",metricName="areaUnderROC")
 evaluator.evaluate(predictionslr)
 
-lrModel.write().overwrite().save("s3a://ml-field/demo/flight-analysis/data/models/large_model")
+## Already Done
+#lrModel.write().overwrite().save("s3a://ml-field/demo/flight-analysis/data/models/large_model")
