@@ -34,21 +34,27 @@ sdf_schema(flight_df) %>% as.data.frame %>% t
 
 flight_df <- flight_df %>% na.omit()
 
+## TIP UDF
+#
+#convert_time_to_hour <- function(x) {
+#  if (nchar(x) == 4) {
+#    return(x)
+#    } 
+#  else {
+#      return(paste("0",x,sep=""))
+#    }
+#}
+#
+#flight_df <- flight_df %>% spark_apply(convert_time_to_hour,columns=c("CRS_DEP_HOUR"))
+
+
 flight_df_mutated <- flight_df %>%
   mutate(CRS_DEP_HOUR = ifelse(length(CRS_DEP_TIME) == 4,CRS_DEP_TIME,paste("0",CRS_DEP_TIME,sep=""))) %>% 
   mutate(CRS_DEP_HOUR = as.numeric(substring(CRS_DEP_HOUR,0,2))) %>%
   mutate(WEEK = as.numeric(weekofyear(FL_DATE))) %>%
   select(CANCELLED,DISTANCE,ORIGIN,DEST,WEEK,CRS_DEP_HOUR,OP_CARRIER,CRS_ELAPSED_TIME)
 
-#flight_df %>% filter(OP_CARRIER_FL_NUM == "2377",OP_CARRIER == "AA") %>% as.data.frame
-
-
 sdf_schema(flight_df) %>% as.data.frame %>% t
-
-#flight_df_mutated_tbl <- flight_df_mutated %>%
-#  mutate(
-#    ORIGIN_INDEX = ft_string_indexer(ORIGIN)
-#    )
 
 flight_partitions <- flight_df_mutated %>%
   sdf_random_split(training = 0.7, testing = 0.3, seed = 1111)
@@ -96,48 +102,35 @@ fitted_pipeline <- ml_fit(
   flight_partitions$training
 )
 
-predictions <- ml_transform(
-  fitted_pipeline,
-  flight_partitions$testing
-)
+#predictions <- ml_transform(
+#  fitted_pipeline,
+#  flight_partitions$testing
+#)
+
+predictions <- ml_predict(fitted_pipeline,flight_partitions$testing)
+#ml_binary_classification_evaluator(preds)
 
 ml_binary_classification_evaluator(predictions)
 
+#preds_df <- predictions %>% select(CANCELLED,prediction) %>% collect
+#
+#
+#pROC_obj <- roc(preds_df$CANCELLED,preds_df$prediction,
+#            smoothed = TRUE,
+#            # arguments for ci
+#            ci=TRUE, ci.alpha=0.9, stratified=FALSE,
+#            # arguments for plot
+#            plot=TRUE, auc.polygon=TRUE, max.auc.polygon=TRUE, grid=TRUE,
+#            print.auc=TRUE, show.thres=TRUE)
 
 
+#precrec_obj <- evalmod(scores = preds_df$prediction , labels = preds_df$CANCELLED)
 
 
-ft_dplyr_transformer(spark, flight_df) %>%
-  ml_param("statement")
-
-lr_model <- flight_partitions$training %>%
-  ml_logistic_regression(CANCELLED ~ DISTANCE + ORIGIN)
-
-pred <- sdf_predict(flight_partitions$test, lr_model)
-
-ml_binary_classification_evaluator(pred)
-
-
-
-
-
+#autoplot(precrec_obj)
 
 #op_carrier_indexer = StringIndexer(inputCol ='OP_CARRIER', outputCol = 'OP_CARRIER_INDEXED',handleInvalid="keep")
 #op_carrier_encoder = OneHotEncoder(inputCol ='OP_CARRIER_INDEXED', outputCol='OP_CARRIER_ENCODED')
 
 
 
-## TIP UDF
-#
-#convert_time_to_hour <- function(x) {
-#  if (nchar(x) == 4) {
-#    return(x)
-#    } 
-#  else {
-#      return(paste("0",x,sep=""))
-#    }
-#}
-#
-#flight_df <- flight_df %>% spark_apply(convert_time_to_hour,columns=c("CRS_DEP_HOUR"))
-#
-#flight_df %>% select("CRS_DEP_HOUR")
