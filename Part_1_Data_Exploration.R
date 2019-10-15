@@ -1,3 +1,44 @@
+## Part 1 - Data Exploration
+#For this project, the requirement is to use the flights dataset to predict if a particular flight in the future will be cancelled. This first notebook is used to explore the data.
+#
+#The original dataset comes from [Kaggle](https://www.kaggle.com/yuanyuwendymu/airline-delay-and-cancellation-data-2009-2018) and has a fairly good data dictionary:
+#
+#+ **FL_DATE** Date of the flight, yy/mm/dd
+#+ **OP_CARRIER** Airline Identifier
+#+ **OP_CARRIER_FL_NUM** Flight Number
+#+ **ORIGIN** Starting Airport Code
+#+ **DEST** Destination Airport Code
+#+ **CRS_DEP_TIME** Planned Departure Time
+#+ **DEP_TIME** Actual Departure Time
+#+ **DEP_DELAY** Total Delay on Departure in minutes
+#+ **TAXI_OUT** The time duration elapsed between departure from the origin airport gate and wheels off
+#+ **WHEELS_OFF** The time point that the aircraft's wheels leave the ground
+#+ **WHEELS_ON** The time point that the aircraft's wheels touch on the ground
+#+ **TAXI_IN** The time duration elapsed between wheels-on and gate arrival at the destination airport
+#+ **CRS_ARR_TIME** Planned arrival time
+#+ **ARR_TIME** Actual Arrival Time
+#+ **ARR_DELAY** Total Delay on Arrival in minutes
+#+ **CANCELLED** Flight Cancelled (1 = cancelled)
+#+ **CANCELLATION_CODE** Reason for Cancellation of flight:
+#    A - Airline/Carrier;
+#    B - Weather;
+#    C - National Air System;
+#    D - Security
+#+ **DIVERTED** Aircraft landed on airport that out of schedule
+#+ **CRS_ELAPSED_TIME** Planned time amount needed for the flight trip
+#+ **ACTUAL_ELAPSED_TIME** The time duration between wheels_off and wheels_on time
+#+ **AIR_TIME** Time spent in the air
+#+ **DISTANCE** Distance between two airports
+#+ **CARRIER_DELAY** Delay caused by the airline in minutes
+#+ **WEATHER_DELAY** Delay caused by weather
+#+ **NAS_DELAY** Delay caused by air system
+#+ **SECURITY_DELAY** Delay caused by security
+#+ **LATE_AIRCRAFT_DELAY** Delay cause by late arriving aircraft
+#+ **Unnamed: 27** Useless column
+
+#---
+
+#The various imports
 library(sparklyr)
 library(dplyr)
 library(ggplot2)
@@ -6,12 +47,68 @@ library(psych)
 library(reshape2)
 library(leaflet)
 
-## Spark Config
+#---
+
+### Create the Spark session
+#Connect to spark using the standard Spark Session connector. I've put the connection parameters into each file directly they change dependingo the type of job that is running. You should adjust the following for your specific Spark environment.
+#
+#+ `spark.executor.memory`
+#+ `spark.executor.cores`
+#+ `spark.driver.memory` 
+#+ `spark.executor.instances` 
+#
+#Spark will use the default `master` setting when connecting to the resource manager. With Cloudera CML, this will be Spark on Kubernetes. If you are working on you local machine for testing, add `.master("local[*]")\` before `.getOrCreate()`     
+#
+#The `spark.hadoop.fs.s3a.aws.credentials.provider org.apache.hadoop.fs.s3a.AnonymousAWSCredentialsProvider` will let you access the S3 bucket anonymously, but it doesn't always work. First make sure you have the hadoop-aws class path. It should be present on most recent versions of Spark. 
+#
+#+ `spark.jars.packages org.apache.hadoop:hadoop-aws:2.7.3`
+#
+#You might need to also set:
+#
+#+ `spark.hadoop.fs.s3a.access.key <YOUR AWS_ACCESS_KEY>`
+#+ `spark.hadoop.fs.s3a.secret.key <YOUR AWS SECRET_KEY>`  
+#
+#The config below is specific to the Cloudera CML setup:
+#
+#`spark.yarn.access.hadoopFileSystems s3a://ml-field`
 
 config <- spark_config()
+config$spark.executor.memory <- "16g"
+config$spark.executor.cores <- "4"
+config$spark.driver.memory <- "6g"
+config$spark.executor.instances <- "5"
+
 config$spark.hadoop.fs.s3a.aws.credentials.provider  <- "org.apache.hadoop.fs.s3a.AnonymousAWSCredentialsProvider"
+config$spark.yarn.access.hadoopFileSystems <- "s3a://ml-field"
 config$spark.sql.catalogImplementation <- "in-memory"
 sc <- spark_connect(master = "yarn-client", config=config)
+
+#---
+
+## Load the Spark UI
+#This creates a link the Spark UI. Its specific to CML and needed because of an issue 
+#with TLS that is being fixed. If you are running locally, the Sparklyr connection panel 
+#shoudl provide you with the Spark UI link.
+
+library(cdsw)
+html(paste("<a href='http://spark-",Sys.getenv("CDSW_ENGINE_ID"),".",Sys.getenv("CDSW_DOMAIN"),"' target='_blank'>Spark UI<a>",sep=""))
+
+#---
+
+### Import the data
+#This file was downloaded from 
+#[Kaggle](https://www.kaggle.com/yuanyuwendymu/airline-delay-and-cancellation-data-2009-2018) as a CSV and 
+#uploaded to S3. Since we know the schema already, we can make its correct by defining the schema for the 
+# import rather than relying on inferSchema. Its also faster! 
+#
+#_Note: If you are working in local mode, you should limit the number of rows that are returned._
+#
+#> _HANDY TIP_
+#> 
+#> Use `.persist()` on a data frame that you are work a lot with to prevent Spark from fetching the data 
+#everytime you run query. It will store that dataframe in memory and all operations on that dataframe will 
+#run on the in-memory version.
+#
 
 s3_link_all <-
   "s3a://ml-field/demo/flight-analysis/data/airlines_csv/*"
@@ -63,7 +160,18 @@ airlines %>% count()
 
 airlines %>% sample_n(10) %>% as.data.frame
 
-## Flights Cancelled by Carrier
+#---
+
+### Cancelled Flights by Carrier
+#The first bit of data exploration is to check the flight cancellations by carrier. This is best done by 
+# showing which carrier has the highet percentage of cancelled flights rather than the total number of 
+# cancelled flights. 
+#
+#Concepts introduced in this section:
+#+ `dplyr` verbs. `mutate`,`summarise` etc.
+#+ `filter()`,`group_by` etc.
+#+ `withColumn` and `withColumnRenamed`
+#+ `toPandas()`
 
 cancelled_flights_by_carrier <-
   airlines %>% 
@@ -71,26 +179,27 @@ cancelled_flights_by_carrier <-
   filter(CANCELLED == 1) %>%
   summarise(count_delays = n()) %>%
   arrange(desc(count_delays)) 
-  #collect()
 
 flights_by_carrier <-
   airlines %>% 
   group_by(OP_CARRIER) %>% 
   summarise(count = n()) %>%
   arrange(desc(count))
-  #collect()
 
 flights_by_carrier %>% 
   left_join(cancelled_flights_by_carrier, by = "OP_CARRIER") %>% 
   mutate(delay_percent = (count_delays/count)*100) %>%
   arrange(desc(delay_percent))
 
+#---
 
+### Cancelled flights by Year
+#This is not necessarily useful as a predictive metric, but it is still interesting. 
+#This is the first plot done with a Spark DataFrame using ggplot. Stuff all just works in R
 
-# Plot number of flights per year
-
-## TIP
-## This is important, you can run spark.sql functions inside R
+#> HANDY TIP
+#> This is important, you can run `spark.sql` functions directly inside an `mutate`.
+#> The complete list is available [here](https://spark.apache.org/docs/latest/api/python/pyspark.sql.html#module-pyspark.sql.functions)
 
 flight_counts_by_year <-
   airlines %>% 
@@ -123,7 +232,13 @@ g <-
   geom_hline(yintercept=seq(1, 2, 1), col="white", lwd=0.5)
 plot(g)
 
-## Flights Cancelled by Week of Year
+#---
+
+## Cancelled flights per Week of Year
+#This is a more intersting statistic and likely to have more predictive power. 
+#Week of Year will be a seasonal and generally the flight patterns will have busier 
+#vs less busy times of the year. This will also show the effect that seasonal 
+#weather conditions can have on flight cancellations.
 
 flight_counts_by_week <-
   airlines %>% 
@@ -155,7 +270,14 @@ g <-
   geom_hline(yintercept=seq(1, 4, 1), col="white", lwd=0.5)
 plot(g)
 
-## Flights cancelled by Route, for both directions ORIG<>DEST
+#---
+
+## Calculating Cancelled Routes
+#To work out if route is likely to cancalled, the easiest way is to create a 
+#string that combines the origin and destination. However that works only in on 
+#direction, so calculate for both directions, the code below uses `hash` to create 
+#an interger that is the sum of the a of the origin and a hash of the destination. 
+#This creates a commutative process for any route.
 
 all_routes <- airlines %>% 
   mutate(combo_hash= hash(ORIGIN) + hash(DEST),combo = paste(ORIGIN,DEST,sep="")) %>% 
@@ -187,7 +309,12 @@ cancelled_routes_percentage <-
   
 cancelled_routes_percentage %>% as.data.frame
 
-## Cancelled Routes Plotted on a Map
+#---
+
+## Plotting Cancelled Routes on Map
+#A good practice for good data exploration is using visualisations. The next cell 
+#fetches additional data about airports to join with the cancelled data flights and 
+#then plots this on a `leaflet` map.
 
 spark_read_csv(
   sc,
@@ -239,9 +366,16 @@ for(i in 1:nrow(cancelled_routes_combo)){
 }
 map3
 
-## Which columns are useful?
+#---
 
-## TIP
+## Find Unused Columns
+# Given that our aim is to calculate a prediction for the CANCELLED variable, many of the
+# other columns are no longer relevant. You don't have an actual wheels down time for a
+# cancelled flight. The code below lists the colums that have lots of NA values on 
+# cancelled flights.
+
+#> HANDY TIP
+#> The `dplyr` verbs include `summarise_all` and `select_if` also work on sparklyr
 
 unused_columns <- airlines %>%
   filter(CANCELLED == 1) %>%
@@ -252,6 +386,6 @@ unused_columns %>% as.data.frame
 
 unused_columns %>% colnames
 
-#  filter_all(any_vars(. > 1)) %>% as.data.frame
+
 
 

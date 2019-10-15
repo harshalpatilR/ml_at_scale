@@ -12,6 +12,10 @@ config$spark.driver.memory <- "6g"
 config$spark.sql.catalogImplementation <- "in-memory"
 config$spark.yarn.access.hadoopFileSystems <- "s3a://ml-field"
 
+# config$sparklyr.defaultPackages <- c("org.apache.hadoop:hadoop-aws:2.7.3")
+# config$spark.hadoop.fs.s3a.access.key <- "<YOUR AWS ACCESS KEY>"
+# config$spark.hadoop.fs.s3a.secret.key <- "<YOUR AWS SECRET KEY>""
+
 spark <- spark_connect(master = "local", config=config)
 
 reloaded_model <- ml_load(spark, "s3a://ml-field/demo/flight-analysis/data/models/fitted_pipeline_r")
