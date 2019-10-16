@@ -63,7 +63,7 @@ assembler = VectorAssembler(
     outputCol = 'features')
 
 
-lr = LogisticRegression(featuresCol = 'features', labelCol = 'CANCELLED', maxIter=10, elasticNetParam = 0.0,regParam = 0.01)
+lr = LogisticRegression(featuresCol = 'features', labelCol = 'CANCELLED', maxIter=15, elasticNetParam = 0.0,regParam = 0.01)
 
 pipeline = Pipeline(
   stages=[        

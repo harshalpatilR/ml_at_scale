@@ -198,6 +198,7 @@ flights_by_carrier %>%
 #This is the first plot done with a Spark DataFrame using ggplot. Stuff all just works in R
 
 #> HANDY TIP
+#>
 #> This is important, you can run `spark.sql` functions directly inside an `mutate`.
 #> The complete list is available [here](https://spark.apache.org/docs/latest/api/python/pyspark.sql.html#module-pyspark.sql.functions)
 
@@ -285,7 +286,6 @@ all_routes <- airlines %>%
   group_by(combo_hash) %>%
   summarize(count_all = n(), first_val = first_value(combo)) %>%
   arrange(desc(count_all)) %>%
-  collect
 
 cancelled_routes_all <- airlines %>% 
   filter(CANCELLED == 1) %>%
@@ -294,8 +294,7 @@ cancelled_routes_all <- airlines %>%
   group_by(combo_hash) %>%
   summarize(count = n(), first_val = first_value(combo)) %>%
   arrange(desc(count)) %>%
-  collect
- 
+
 cancelled_routes_percentage <-
   cancelled_routes_all %>% 
   inner_join(all_routes,by="combo_hash") %>%
@@ -311,7 +310,24 @@ cancelled_routes_percentage %>% as.data.frame
 
 #---
 
+### Side Note
+# Interestingly most popular routes have similar numbers of cancelled flights in 
+# either direction.
+
+cancelled_by_route_non_combo <- airlines %>% 
+  filter(CANCELLED == 1) %>%
+  mutate(combo = paste(ORIGIN,DEST,sep="")) %>% 
+  group_by(combo) %>%
+  summarize(count_all = n()) %>%
+  select(combo,count_all) %>%
+  arrange(desc(count_all))
+
+cancelled_by_route_non_combo %>% head(10) %>% as.data.frame
+
+#---
+
 ## Plotting Cancelled Routes on Map
+#
 #A good practice for good data exploration is using visualisations. The next cell 
 #fetches additional data about airports to join with the cancelled data flights and 
 #then plots this on a `leaflet` map.
@@ -375,6 +391,7 @@ map3
 # cancelled flights.
 
 #> HANDY TIP
+#>
 #> The `dplyr` verbs include `summarise_all` and `select_if` also work on sparklyr
 
 unused_columns <- airlines %>%
