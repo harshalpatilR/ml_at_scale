@@ -9,7 +9,7 @@ spark = SparkSession\
     .config("spark.executor.memory","8g")\
     .config("spark.executor.cores","4")\
     .config("spark.driver.memory","6g")\
-    .config("spark.executor.instances","5")\ #reduced this value to run as a job
+    .config("spark.executor.instances","5")\
     .config("spark.yarn.access.hadoopFileSystems","s3a://ml-field")\
     .config("spark.hadoop.fs.s3a.aws.credentials.provider","org.apache.hadoop.fs.s3a.AnonymousAWSCredentialsProvider")\
     .getOrCreate()    
@@ -50,22 +50,26 @@ schema = StructType(
   ]
 )
 
-df=spark.read.csv(
+flight_df = spark.read.csv(
   path="s3a://ml-field/demo/flight-analysis/data/airlines_csv/*",
   header=True,
   schema=schema
 )
 
 from pyspark.sql.types import StringType
-from pyspark.sql.functions import udf
+from pyspark.sql.functions import udf,weekofyear
 
 # pad_time = udf(lambda x: x if len(x) == 4 else "0{}".format(x),StringType())
 
 # df.select("CRS_DEP_TIME").\
 #   withColumn('pad_time', pad_time("CRS_DEP_TIME")).show()
 
+# This has been added to help with partitioning.
+flight_df = flight_df\
+  .withColumn('WEEK',weekofyear('FL_DATE').cast('double'))
 
-smaller_data_set = df.select(
+smaller_data_set = flight_df.select(
+  "WEEK",
   "FL_DATE",
   "OP_CARRIER",
   "OP_CARRIER_FL_NUM",
@@ -81,4 +85,7 @@ smaller_data_set = df.select(
 smaller_data_set.show()
 
 # This is commented out as it has already been run
-#smaller_data_set.write.parquet(path="s3a://ml-field/demo/flight-analysis/data/airline_parquet_2/",compression="snappy")
+#smaller_data_set.write.parquet(
+#  path="s3a://ml-field/demo/flight-analysis/data/airline_parquet_partitioned/",
+#  partitionBy="WEEK",
+#  compression="snappy")

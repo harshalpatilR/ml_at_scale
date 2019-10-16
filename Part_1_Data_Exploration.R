@@ -286,6 +286,7 @@ all_routes <- airlines %>%
   group_by(combo_hash) %>%
   summarize(count_all = n(), first_val = first_value(combo)) %>%
   arrange(desc(count_all)) %>%
+  collect
 
 cancelled_routes_all <- airlines %>% 
   filter(CANCELLED == 1) %>%
@@ -294,6 +295,7 @@ cancelled_routes_all <- airlines %>%
   group_by(combo_hash) %>%
   summarize(count = n(), first_val = first_value(combo)) %>%
   arrange(desc(count)) %>%
+  collect
 
 cancelled_routes_percentage <-
   cancelled_routes_all %>% 
