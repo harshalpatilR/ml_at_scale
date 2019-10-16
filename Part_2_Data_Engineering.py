@@ -6,15 +6,13 @@ import os
 spark = SparkSession\
     .builder\
     .appName("Airline")\
+    .config("spark.executor.memory","8g")\
+    .config("spark.executor.cores","4")\
+    .config("spark.driver.memory","6g")\
+    .config("spark.executor.instances","5")\ #reduced this value to run as a job
+    .config("spark.yarn.access.hadoopFileSystems","s3a://ml-field")\
     .config("spark.hadoop.fs.s3a.aws.credentials.provider","org.apache.hadoop.fs.s3a.AnonymousAWSCredentialsProvider")\
-    .getOrCreate()
-    
-#    .config("spark.executor.memory","8g")\
-#    .config("spark.executor.cores","4")\
-#    .config("spark.driver.memory","6g")\
-#    .config("spark.executor.instances","3")\
-#    .config("spark.dynamicAllocation.enabled","false")\    
-
+    .getOrCreate()    
 
 
 from IPython.core.display import HTML
@@ -61,10 +59,11 @@ df=spark.read.csv(
 from pyspark.sql.types import StringType
 from pyspark.sql.functions import udf
 
-pad_time = udf(lambda x: x if len(x) == 4 else "0{}".format(x),StringType())
+# pad_time = udf(lambda x: x if len(x) == 4 else "0{}".format(x),StringType())
 
-df.select("CRS_DEP_TIME").\
-  withColumn('pad_time', pad_time("CRS_DEP_TIME")).show()
+# df.select("CRS_DEP_TIME").\
+#   withColumn('pad_time', pad_time("CRS_DEP_TIME")).show()
+
 
 smaller_data_set = df.select(
   "FL_DATE",
