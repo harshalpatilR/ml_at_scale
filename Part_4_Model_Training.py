@@ -19,21 +19,21 @@ spark = SparkSession\
 #.config("spark.hadoop.fs.s3a.aws.credentials.provider","org.apache.hadoop.fs.s3a.AnonymousAWSCredentialsProvider")\
 
 flight_df_original =spark.read.parquet(
-  "s3a://ml-field/demo/flight-analysis/data/airline_parquet_2/",
+  "s3a://ml-field/demo/flight-analysis/data/airline_parquet_partitioned/",
 )
 
 flight_df = flight_df_original.na.drop()
 flight_df.persist()
 
 
-# flight_df = flight_df\
-#     .withColumn(
-#         'CRS_DEP_HOUR',
-#         when(
-#             length(col("CRS_DEP_TIME")) == 4,col("CRS_DEP_TIME")
-#         )\
-#         .otherwise(concat(lit("0"),col("CRS_DEP_TIME")))
-#     )
+flight_df = flight_df\
+   .withColumn(
+       'CRS_DEP_HOUR',
+       when(
+           length(col("CRS_DEP_TIME")) == 4,col("CRS_DEP_TIME")
+       )\
+       .otherwise(concat(lit("0"),col("CRS_DEP_TIME")))
+   )
 
 flight_df = flight_df.withColumn('CRS_DEP_HOUR',col('CRS_DEP_HOUR').cast('double'))
 flight_df = flight_df.withColumn('WEEK',weekofyear('FL_DATE').cast('double'))
