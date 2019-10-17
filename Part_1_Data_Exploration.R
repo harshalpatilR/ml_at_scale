@@ -72,11 +72,13 @@ library(leaflet)
 #
 #`spark.yarn.access.hadoopFileSystems s3a://ml-field`
 
+#spark_home_set("/etc/spark/")
 config <- spark_config()
 config$spark.executor.memory <- "16g"
 config$spark.executor.cores <- "4"
 config$spark.driver.memory <- "6g"
 config$spark.executor.instances <- "10"
+config$spark.dynamicAllocation.enabled  <- "false"
 
 config$spark.hadoop.fs.s3a.aws.credentials.provider  <- "org.apache.hadoop.fs.s3a.AnonymousAWSCredentialsProvider"
 config$spark.yarn.access.hadoopFileSystems <- "s3a://ml-field"

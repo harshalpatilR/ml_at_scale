@@ -16,7 +16,7 @@ library(dplyr)
 # ## Start the Spark Session
 # Note the changes to `spark.executor.memory` and `spark.executor.instances`. SparkML processes are more memory intensive and therefore require a different configuration to run efficiently.
 
-##spark_home_set("/etc/spark/")
+#spark_home_set("/etc/spark/")
 
 config <- spark_config()
 config$spark.hadoop.fs.s3a.aws.credentials.provider  <- "org.apache.hadoop.fs.s3a.AnonymousAWSCredentialsProvider"
