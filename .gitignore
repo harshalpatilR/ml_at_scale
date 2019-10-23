@@ -4,5 +4,5 @@ R
 *.code-workspace
 _*
 derby.log
-metastore_db
+metastore_db*
 spark-warehouse
