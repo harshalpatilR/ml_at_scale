@@ -22,6 +22,10 @@ flight_df_original =spark.read.parquet(
   "s3a://ml-field/demo/flight-analysis/data/airline_parquet_partitioned/",
 )
 
+# You can uncomment this and comment the previous line to get the able from Hive rather.
+#!cp /home/cdsw/hive-site.xml /etc/hadoop/conf/
+#flight_df_original = spark.sql("select * from default.flight_test_table")
+
 flight_df = flight_df_original.na.drop()
 flight_df.persist()
 

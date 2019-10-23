@@ -3,3 +3,6 @@ R
 !.gitignore
 *.code-workspace
 _*
+derby.log
+metastore_db
+spark-warehouse

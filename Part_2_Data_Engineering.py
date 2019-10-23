@@ -84,8 +84,22 @@ smaller_data_set = flight_df.select(
 
 smaller_data_set.show()
 
+smaller_data_set.write.saveAsTable('default.flight_test_table', format='parquet', mode='overwrite', path='s3a://ml-field/demo/ml_at_scale/')
+
+
 # This is commented out as it has already been run
 #smaller_data_set.write.parquet(
 #  path="s3a://ml-field/demo/flight-analysis/data/airline_parquet_partitioned/",
 #  partitionBy="WEEK",
 #  compression="snappy")
+
+
+# This will write the able to Hive to be used for other SQL services.
+#!cp /home/cdsw/hive-site.xml /etc/hadoop/conf/
+#smaller_data_set.write.saveAsTable(
+#  'default.flight_test_table', 
+#  format='parquet', 
+#  mode='overwrite', 
+#  path='s3a://ml-field/demo/ml_at_scale/'
+#  partitionBy="WEEK")
+
